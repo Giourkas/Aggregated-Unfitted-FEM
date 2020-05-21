@@ -1,0 +1,13 @@
+Implementation
+==============
+The steps for the implementation of the technique follow the below order in general:
+
+1. Build of the mesh using an artificial domain with simple geometry which includes the physical domain.
+2. Definition and visualization of cut, inner, outer elements (cells).
+3. Clustering of the cut elements with the inner elements of the physical domain.
+4. Mapping active degrees of freedom to the aggregation.
+5. Assemble to a matrix to solve the weak formulation of the Poisson problem.
+6. Strange behaviour remark.
+7. Testing.
+
+

@@ -1,0 +1,324 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>cluster_info &#8212; Practical Course  documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for cluster_info</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;This is the basic module of the algorithm to build the clusters. Firstly, it defines a new class to generate the clusters and another function to give the distance between the cells. The idea is to build a cluster between an inner cell and neighbour cut cells having the smallest distance. There are also two functions defined for the visualization of clusters created.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># ngsolve stuff</span>
+<span class="kn">from</span> <span class="nn">ngsolve</span> <span class="k">import</span> <span class="o">*</span>
+<span class="c1"># Basic geometry features (for the background mesh)</span>
+<span class="kn">from</span> <span class="nn">netgen.geom2d</span> <span class="k">import</span> <span class="n">SplineGeometry</span>
+<span class="c1"># Visualization</span>
+<span class="kn">from</span> <span class="nn">ngsolve.internal</span> <span class="k">import</span> <span class="o">*</span>
+<span class="c1"># Basic xfem functionality</span>
+<span class="kn">from</span> <span class="nn">xfem</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<div class="viewcode-block" id="copy_bitarray"><a class="viewcode-back" href="../index.html#cluster_info.copy_bitarray">[docs]</a><span class="k">def</span> <span class="nf">copy_bitarray</span><span class="p">(</span><span class="n">a</span><span class="p">):</span>
+	<span class="sd">&quot;&quot;&quot;Creates a copy of a BitArray structure</span>
+
+<span class="sd">	Args:</span>
+<span class="sd">		a (BitArray):</span>
+
+<span class="sd">	Returns:</span>
+<span class="sd">		BitArray, A copy of a</span>
+
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="n">copy</span> <span class="o">=</span> <span class="n">BitArray</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">))</span>
+	<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)):</span>
+		<span class="n">copy</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+	<span class="k">return</span> <span class="n">copy</span></div>
+
+<div class="viewcode-block" id="CusterInfo"><a class="viewcode-back" href="../index.html#cluster_info.CusterInfo">[docs]</a><span class="k">class</span> <span class="nc">CusterInfo</span><span class="p">:</span>
+	<span class="sd">&quot;&quot;&quot;Class to generate the clusters when doing unfitted FEM</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="CusterInfo.__init__"><a class="viewcode-back" href="../index.html#cluster_info.CusterInfo.__init__">[docs]</a>	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ad_info</span><span class="p">,</span> <span class="n">cut_info</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;Constructor</span>
+
+<span class="sd">		Arguments:</span>
+<span class="sd">			ad_info (AdInfo):</span>
+<span class="sd">				Usually created via AdInfo(mesh), where mesh is cut_info.Mesh()</span>
+
+<span class="sd">			cut_info (CutInfo):</span>
+<span class="sd">				The cut info to which to compute the clusters.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">mesh</span> <span class="o">=</span> <span class="n">cut_info</span><span class="o">.</span><span class="n">Mesh</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">ad_info</span> <span class="o">=</span> <span class="n">ad_info</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">cut_info</span> <span class="o">=</span> <span class="n">cut_info</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">cluster_map</span> <span class="o">=</span> <span class="p">{}</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">distance_map</span> <span class="o">=</span> <span class="p">{}</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">build_clusters</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">ci_pos</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">GetFacesOfType</span><span class="p">(</span><span class="n">POS</span><span class="p">)</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">ci_neg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">GetFacesOfType</span><span class="p">(</span><span class="n">NEG</span><span class="p">)</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">ci_if</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">GetFacesOfType</span><span class="p">(</span><span class="n">IF</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CusterInfo.element_corners"><a class="viewcode-back" href="../index.html#cluster_info.CusterInfo.element_corners">[docs]</a>	<span class="k">def</span> <span class="nf">element_corners</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">e_id</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;returns a list of all verticies adjacent to an element</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">NodeId</span><span class="p">(</span><span class="n">CELL</span><span class="p">,</span> <span class="n">e_id</span><span class="p">)]</span><span class="o">.</span><span class="n">vertices</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">NodeId</span><span class="p">(</span><span class="n">FACE</span><span class="p">,</span> <span class="n">e_id</span><span class="p">)]</span><span class="o">.</span><span class="n">vertices</span></div>
+
+<div class="viewcode-block" id="CusterInfo.distance_cell_to_cell"><a class="viewcode-back" href="../index.html#cluster_info.CusterInfo.distance_cell_to_cell">[docs]</a>	<span class="k">def</span> <span class="nf">distance_cell_to_cell</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f_id1</span><span class="p">,</span> <span class="n">f_id2</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;Helper method to compute the distance of two elements, just</span>
+<span class="sd">		computes the distance between the middlepoints of the two elements.</span>
+
+<span class="sd">		Args:</span>
+<span class="sd">			f_id1 (int):</span>
+<span class="sd">				The index of the first Element</span>
+
+<span class="sd">			f_id2 (int):</span>
+<span class="sd">				The index of the second Element</span>
+
+<span class="sd">		Returns:</span>
+<span class="sd">			float. The distance of the two Elements</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="n">corners1</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">element_corners</span><span class="p">(</span><span class="n">f_id1</span><span class="p">)]</span>
+		<span class="n">corners2</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">element_corners</span><span class="p">(</span><span class="n">f_id2</span><span class="p">)]</span>
+		<span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">corners1</span><span class="p">)</span><span class="o">/</span><span class="nb">len</span><span class="p">(</span><span class="n">corners1</span><span class="p">)</span> <span class="o">-</span> <span class="nb">sum</span><span class="p">(</span><span class="n">corners2</span><span class="p">)</span><span class="o">/</span><span class="nb">len</span><span class="p">(</span><span class="n">corners2</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="CusterInfo.GetFacesOfType"><a class="viewcode-back" href="../index.html#cluster_info.CusterInfo.GetFacesOfType">[docs]</a>	<span class="k">def</span> <span class="nf">GetFacesOfType</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;wrapper for cut_info.GetElementsOfType that uses the same</span>
+<span class="sd">		ordering as used by mesh[NodeId(FACE, id)]</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="n">el</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cut_info</span><span class="o">.</span><span class="n">GetElementsOfType</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+		<span class="n">res</span> <span class="o">=</span> <span class="n">BitArray</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">el</span><span class="p">))</span>
+		<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">el</span><span class="p">)):</span>
+			<span class="n">res</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">ad_info</span><span class="o">.</span><span class="n">element_to_face</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="o">=</span>  <span class="n">el</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+		<span class="k">return</span> <span class="n">res</span></div>
+
+<div class="viewcode-block" id="CusterInfo.build_clusters"><a class="viewcode-back" href="../index.html#cluster_info.CusterInfo.build_clusters">[docs]</a>	<span class="k">def</span> <span class="nf">build_clusters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;Helper method to do the actual work, only called by the constructor</span>
+<span class="sd">		of this class</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">cluster_map</span> <span class="o">=</span> <span class="p">{}</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">distance_map</span> <span class="o">=</span> <span class="p">{}</span>
+		<span class="n">ci_neg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">GetFacesOfType</span><span class="p">(</span><span class="n">NEG</span><span class="p">)</span>
+		<span class="n">ci_if</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">GetFacesOfType</span><span class="p">(</span><span class="n">IF</span><span class="p">)</span>
+		<span class="c1">#Important: ci_neg, ci_if are direct references to the ci object, so we may not change them</span>
+		<span class="c1">#So we make a copy here.</span>
+		<span class="c1">#Use a bitset instead of a list of indices so that we change it while iterating without problems.</span>
+		<span class="n">faces_left</span> <span class="o">=</span> <span class="n">copy_bitarray</span><span class="p">(</span><span class="n">ci_if</span><span class="p">)</span>
+
+		<span class="c1">#The first iteration, add all split faces to adjacent inner faces</span>
+		<span class="k">for</span> <span class="n">f_id</span><span class="p">,</span> <span class="n">is_in</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">faces_left</span><span class="p">):</span>
+			<span class="k">if</span> <span class="n">is_in</span><span class="p">:</span>
+				<span class="c1">#Assign border faces of adjacent inner faces</span>
+				<span class="n">candidates</span> <span class="o">=</span> <span class="p">[</span><span class="n">ad_f_id</span> <span class="k">for</span> <span class="n">ad_f_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ad_info</span><span class="o">.</span><span class="n">get_ajacent_faces</span><span class="p">(</span><span class="n">f_id</span><span class="p">)</span> <span class="k">if</span> <span class="n">ci_neg</span><span class="p">[</span><span class="n">ad_f_id</span><span class="p">]]</span>
+				<span class="k">if</span> <span class="kc">False</span><span class="p">:</span>
+					<span class="k">pass</span>
+				<span class="k">else</span><span class="p">:</span>
+					<span class="k">for</span> <span class="n">ad_f_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ad_info</span><span class="o">.</span><span class="n">get_ajacent_faces</span><span class="p">(</span><span class="n">f_id</span><span class="p">):</span>
+						<span class="k">if</span> <span class="n">ci_neg</span><span class="p">[</span><span class="n">ad_f_id</span><span class="p">]:</span>
+							<span class="bp">self</span><span class="o">.</span><span class="n">cluster_map</span><span class="p">[</span><span class="n">f_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">ad_f_id</span>
+							<span class="n">faces_left</span><span class="p">[</span><span class="n">f_id</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+							<span class="bp">self</span><span class="o">.</span><span class="n">distance_map</span><span class="p">[</span><span class="n">f_id</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+
+		<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+			<span class="c1"># Once all border faces are assigned we are done.</span>
+			<span class="n">left_todo</span> <span class="o">=</span> <span class="n">faces_left</span><span class="o">.</span><span class="n">NumSet</span><span class="p">()</span>
+			<span class="k">if</span> <span class="n">left_todo</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+				<span class="k">break</span>
+			<span class="k">for</span> <span class="n">f_id</span><span class="p">,</span> <span class="n">is_in</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">faces_left</span><span class="p">):</span>
+				<span class="k">if</span> <span class="n">is_in</span><span class="p">:</span>
+					<span class="c1"># Assign the face to the same inner face as any adjacent border cell.</span>
+					<span class="n">candidates</span> <span class="o">=</span> <span class="p">[</span><span class="n">ad_f_id</span> <span class="k">for</span> <span class="n">ad_f_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ad_info</span><span class="o">.</span><span class="n">get_ajacent_faces</span><span class="p">(</span><span class="n">f_id</span><span class="p">)</span> <span class="k">if</span> <span class="n">ad_f_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cluster_map</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">distance_map</span><span class="p">[</span><span class="n">ad_f_id</span><span class="p">]</span> <span class="o">==</span> <span class="n">i</span><span class="p">]</span>
+					<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">candidates</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+						<span class="n">nearest_f_id</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">candidates</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ad_face_id</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">distance_cell_to_cell</span><span class="p">(</span><span class="n">ad_face_id</span><span class="p">,</span> <span class="n">f_id</span><span class="p">))</span>
+						<span class="n">faces_left</span><span class="p">[</span><span class="n">f_id</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+						<span class="bp">self</span><span class="o">.</span><span class="n">cluster_map</span><span class="p">[</span><span class="n">f_id</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cluster_map</span><span class="p">[</span><span class="n">nearest_f_id</span><span class="p">]</span>
+						<span class="bp">self</span><span class="o">.</span><span class="n">distance_map</span><span class="p">[</span><span class="n">f_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span>
+					<span class="k">if</span> <span class="kc">False</span><span class="p">:</span>
+						<span class="k">for</span> <span class="n">ad_f_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ad_info</span><span class="o">.</span><span class="n">get_ajacent_faces</span><span class="p">(</span><span class="n">f_id</span><span class="p">):</span>
+							<span class="k">if</span> <span class="n">ad_f_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cluster_map</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">distance_map</span><span class="p">[</span><span class="n">ad_f_id</span><span class="p">]</span> <span class="o">==</span> <span class="n">i</span><span class="p">:</span>
+								<span class="n">faces_left</span><span class="p">[</span><span class="n">f_id</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+								<span class="bp">self</span><span class="o">.</span><span class="n">cluster_map</span><span class="p">[</span><span class="n">f_id</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cluster_map</span><span class="p">[</span><span class="n">ad_f_id</span><span class="p">]</span>
+								<span class="bp">self</span><span class="o">.</span><span class="n">distance_map</span><span class="p">[</span><span class="n">f_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span></div>
+			<span class="c1"># Assert that we make progress. This can only fail if there is a cut</span>
+			<span class="c1"># face that is not connected to any inner face</span>
+			<span class="c1"># assert(left_todo != faces_left.NumSet())</span>
+
+<div class="viewcode-block" id="CusterInfo.get_cluster"><a class="viewcode-back" href="../index.html#cluster_info.CusterInfo.get_cluster">[docs]</a>	<span class="k">def</span> <span class="nf">get_cluster</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">face_id</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;Returns the id of the cluster the Element belongs to, that id</span>
+<span class="sd">		is the same as the Element id of the single uncut element in that cluster.</span>
+
+<span class="sd">		Args:</span>
+<span class="sd">			face_id (int):</span>
+<span class="sd">				The index of the element</span>
+
+<span class="sd">		Returns:</span>
+<span class="sd">			int. The index of the cluster.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">assert</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">ci_pos</span><span class="p">[</span><span class="n">face_id</span><span class="p">]),</span> <span class="s2">&quot;outer faces have no cluster&quot;</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ci_neg</span><span class="p">[</span><span class="n">face_id</span><span class="p">]:</span>
+			<span class="k">return</span> <span class="n">face_id</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cluster_map</span><span class="p">[</span><span class="n">face_id</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="CusterInfo.draw_clusters_inone"><a class="viewcode-back" href="../index.html#cluster_info.CusterInfo.draw_clusters_inone">[docs]</a>	<span class="k">def</span> <span class="nf">draw_clusters_inone</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;Tries to draw all clusters in one image. Due to the limited</span>
+<span class="sd">		number of colors, this will not always work very well.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">def</span> <span class="nf">shuffle</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+			<span class="k">return</span> <span class="n">n</span> <span class="o">%</span> <span class="mi">7</span><span class="o">+</span> <span class="mi">1</span>
+		<span class="n">gf_enumbers</span> <span class="o">=</span> <span class="n">GridFunction</span><span class="p">(</span><span class="n">L2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">))</span>
+
+		<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">gf_enumbers</span><span class="o">.</span><span class="n">vec</span><span class="p">)):</span>
+			<span class="n">f_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ad_info</span><span class="o">.</span><span class="n">element_to_face</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+			<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ci_pos</span><span class="p">[</span><span class="n">f_id</span><span class="p">]:</span>
+				<span class="n">gf_enumbers</span><span class="o">.</span><span class="n">vec</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+			<span class="k">else</span><span class="p">:</span>
+				<span class="n">gf_enumbers</span><span class="o">.</span><span class="n">vec</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">shuffle</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_cluster</span><span class="p">(</span><span class="n">f_id</span><span class="p">))</span>
+		<span class="n">Draw</span><span class="p">(</span><span class="n">gf_enumbers</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">,</span> <span class="s2">&quot;clusters&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CusterInfo.draw_cluster"><a class="viewcode-back" href="../index.html#cluster_info.CusterInfo.draw_cluster">[docs]</a>	<span class="k">def</span> <span class="nf">draw_cluster</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f_id</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;Draws the cluster with the given id, that is the id of the</span>
+<span class="sd">		unique uncut element in that cluster</span>
+
+<span class="sd">		Args:</span>
+<span class="sd">			face_id (int):</span>
+<span class="sd">				The index of the element</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="n">gf_enumbers</span> <span class="o">=</span> <span class="n">GridFunction</span><span class="p">(</span><span class="n">L2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">))</span>
+		<span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
+		<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">gf_enumbers</span><span class="o">.</span><span class="n">vec</span><span class="p">)):</span>
+			<span class="n">f2_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ad_info</span><span class="o">.</span><span class="n">element_to_face</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+			<span class="k">if</span> <span class="n">f_id</span> <span class="o">==</span> <span class="n">f2_id</span><span class="p">:</span>
+				<span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+				<span class="n">gf_enumbers</span><span class="o">.</span><span class="n">vec</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+			<span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">ci_pos</span><span class="p">[</span><span class="n">f2_id</span><span class="p">]:</span>
+				<span class="n">gf_enumbers</span><span class="o">.</span><span class="n">vec</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+			<span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_cluster</span><span class="p">(</span><span class="n">f2_id</span><span class="p">)</span> <span class="o">==</span> <span class="n">f_id</span><span class="p">:</span>
+				<span class="n">gf_enumbers</span><span class="o">.</span><span class="n">vec</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span>
+				<span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+			<span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">ci_neg</span><span class="p">[</span><span class="n">f2_id</span><span class="p">]:</span>
+				<span class="n">gf_enumbers</span><span class="o">.</span><span class="n">vec</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3</span>
+			<span class="k">else</span><span class="p">:</span>
+				<span class="n">gf_enumbers</span><span class="o">.</span><span class="n">vec</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">4</span>
+		<span class="k">if</span> <span class="n">count</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+			<span class="n">Draw</span><span class="p">(</span><span class="n">gf_enumbers</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">,</span> <span class="s2">&quot;cluster&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">f_id</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;(&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">count</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;)&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CusterInfo.draw_clusters"><a class="viewcode-back" href="../index.html#cluster_info.CusterInfo.draw_clusters">[docs]</a>	<span class="k">def</span> <span class="nf">draw_clusters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;Draws all calculated clusters, each in a diffent image</span>
+<span class="sd">		named &#39;&quot;cluster&lt;custer_id&gt;(&lt;custer_size&gt;)&#39;</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">nnodes</span><span class="p">(</span><span class="n">ELEMENT</span><span class="p">)):</span>
+			<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ci_neg</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">draw_cluster</span><span class="p">(</span><span class="n">i</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CusterInfo.get_posible_interpolation_faces"><a class="viewcode-back" href="../index.html#cluster_info.CusterInfo.get_posible_interpolation_faces">[docs]</a>	<span class="k">def</span> <span class="nf">get_posible_interpolation_faces</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;Returns a list of all Elements that could be used to interpolate the</span>
+<span class="sd">		DOF associated to the vertex with the given id.</span>
+
+<span class="sd">		Args:</span>
+<span class="sd">			vertex_id (int):</span>
+<span class="sd">				The index of the vertex</span>
+<span class="sd">		</span>
+<span class="sd">		Returns:</span>
+<span class="sd">			list of int. List of indices of Elements.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="n">ad_faces</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ad_info</span><span class="o">.</span><span class="n">get_vertex_ajacent_faces</span><span class="p">(</span><span class="n">vertex_id</span><span class="p">)</span>
+		<span class="k">assert</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ci_neg</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">ad_faces</span><span class="p">),</span> <span class="s2">&quot;No interpolation needed&quot;</span>
+		<span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">get_cluster</span><span class="p">(</span><span class="n">face_id</span><span class="p">)</span> <span class="k">for</span> <span class="n">face_id</span> <span class="ow">in</span> <span class="n">ad_faces</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ci_if</span><span class="p">[</span><span class="n">face_id</span><span class="p">]]</span></div>
+
+<div class="viewcode-block" id="CusterInfo.get_interpolation_face"><a class="viewcode-back" href="../index.html#cluster_info.CusterInfo.get_interpolation_face">[docs]</a>	<span class="k">def</span> <span class="nf">get_interpolation_face</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;Returns the Elements that should be used to interpolate the given vertexs</span>
+
+<span class="sd">		Args:</span>
+<span class="sd">			vertex_id (int):</span>
+<span class="sd">				The index of the vertex</span>
+<span class="sd">		</span>
+<span class="sd">		Returns:</span>
+<span class="sd">			int. Index of the element.</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">def</span> <span class="nf">distance_cell_to_vertex</span><span class="p">(</span><span class="n">face_id</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">):</span>
+			<span class="n">face_corners</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">NodeId</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ad_info</span><span class="o">.</span><span class="n">get_element_name</span><span class="p">(),</span> <span class="n">face_id</span><span class="p">)]</span><span class="o">.</span><span class="n">vertices</span><span class="p">]</span>
+			<span class="n">face_pos</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">face_corners</span><span class="p">)</span><span class="o">/</span><span class="nb">len</span><span class="p">(</span><span class="n">face_corners</span><span class="p">)</span>
+			<span class="n">vertex_pos</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">NodeId</span><span class="p">(</span><span class="n">VERTEX</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">)]</span><span class="o">.</span><span class="n">point</span><span class="p">)</span>
+			<span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">face_pos</span><span class="o">-</span><span class="n">vertex_pos</span><span class="p">)</span>
+		<span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_posible_interpolation_faces</span><span class="p">(</span><span class="n">vertex_id</span><span class="p">),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">face_id</span><span class="p">:</span> <span class="n">distance_cell_to_vertex</span><span class="p">(</span><span class="n">face_id</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">))</span></div></div>
+
+
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Daniel Draeger, Georgios Kypros.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.7</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,605 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Aggregated Unfitted FEM’s documentation! &#8212; Practical Course  documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="aggregated-unfitted-fem-s-documentation">
+<h1>Aggregated Unfitted FEM’s documentation!<a class="headerlink" href="#aggregated-unfitted-fem-s-documentation" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+</div>
+<div class="section" id="motivation">
+<h1>Motivation<a class="headerlink" href="#motivation" title="Permalink to this headline">¶</a></h1>
+<p>The finite element method is a common way to numerically solve differential equations: One generates a mesh on the physical domain <span class="math">\(\Omega\)</span> of the function space and restricts the function space to the H<sup>1</sup> space associated to that mesh which is in the simplest case defined to have one basis function per mesh vertex which is defined in a way that it is zero on all other vertices and has compact support around that vertex. Solutions of differential equations can then be formulated as the f in H<sup>1</sup> such that <span class="math">\(L(f, g) = K(g)\)</span> for all g in H<sup>1</sup> with a fixed bilinear form L and a linear form <span class="math">\(K\)</span>. By computing <span class="math">\(K\)</span>, and <span class="math">\(L\)</span> on all basis functions the differential equations then become linear equations of the form <span class="math">\(A u = b\)</span>.</p>
+<p>Often it is difficult to find a good mesh for a given space <span class="math">\(\Omega\)</span> but easy to generate mesh on a larger space  <span class="math">\(\Omega_{art} \supset \Omega\)</span> . Using the same method as described before is still possible and is in this case called the unfitted finite element method. However, these techniques are prone to severe ill conditioning problems that obstruct the efficient use of iterative Krylov methods and, in consequence, hinders the practical usage of unfitted methods for realistic large scale applications. The work by Badia, Verdugo and Martin presents a technique which we implement, called the aggregated unfitted finite element method, that addresses such conditioning problems by constructing enhanced finite element spaces based on a cell aggregation technique. The mathematical analysis of the new method states that the condition number of the resulting linear system matrix scales as in standard finite elements for body-fitted meshes, without being affected by small cut cells, and that the method leads to the optimal finite element convergence order.</p>
+<p>For most of the unfitted FE techniques, the condition number of the discrete linear system does not only depend on the characteristic element size of the background mesh, but also on the characteristic size of the cut cells, which can be arbitrary small and have arbitrarily high aspect ratios. The main goal of this work is to implement this enhanced unfitted FE formulation that fixes the problems associated with cut cells. The algorithm does achieve condition numbers that scale only with the element size of the background mesh in the same way as in standard FE methods for body-fitted meshes.</p>
+</div>
+<div class="section" id="implementation">
+<h1>Implementation<a class="headerlink" href="#implementation" title="Permalink to this headline">¶</a></h1>
+<p>Starting form the H1 space, the algorithm eliminates from this space all the potentially problematic DOFs by introducing a set of judiciously defined constraints. These constraints are introduced using information provided by mapping exterior verticies to close inner cells, without altering the conformity of the original FE space. Alternatively, the method can be understood as an extension operator from the interior (well-posed) FE space that only involves interior cells to a larger FE space that includes cut cells and covers the whole physical domain.</p>
+<p>The first step of the method is to build a computational mesh on the artificial domain <span class="math">\(Ω_{art}\)</span> such that it has simple geometry that is easy to mesh using Cartesian grids and it includes our physical domain <span class="math">\(Ω\subset Ω_{art}\)</span>. As we create the mesh, some of the or cells are cut in the boundary of the physical domain. These are noted as cut cells: <code class="xref py py-func docutils literal"><span class="pre">ci.GetElementsOfType(IF)()</span></code>, while the cells outside of the physical domain are given by <code class="xref py py-func docutils literal"><span class="pre">ci.GetElementsOfType(POS)()</span></code> and these inside the physical domain from <code class="xref py py-func docutils literal"><span class="pre">ci.GetElementsOfType(NEG)()</span></code>. The first three pictures show an example of the 3 different cell properties on the level set:</p>
+<p>lvlset = <span class="math">\(\sqrt{ \sqrt{x^4+y^4} -1}\)</span>
+which defines <span class="math">\(Ω\)</span> by: <span class="math">\(Ω = \{ x \in Ω_{art} | \text{lvlset}(x) &lt; 0 \}\)</span>
+The following images show the cut, inside and outside cells respectively:</p>
+<p><a class="reference internal" href="_images/cut_cells.png"><img alt="cut_cells" src="_images/cut_cells.png" style="width: 200px; height: 200px;" /></a> <a class="reference internal" href="_images/inner_cells.png"><img alt="inner_cells" src="_images/inner_cells.png" style="width: 200px; height: 200px;" /></a> <a class="reference internal" href="_images/outside_cells.png"><img alt="outside_cells" src="_images/outside_cells.png" style="width: 200px; height: 200px;" /></a></p>
+<p>The following figures show another example of a physical domain <span class="math">\(Ω\)</span> inside <span class="math">\(Ω_{art}(A)\)</span>, and the internal, cut and external cells summarized (B).</p>
+<p><img alt="incutex" src="_images/domain.png" /></p>
+<p>For the second step, after we have distincted which elements are inside, outside and cut, the algorithm includes information about the adjacency of every cut cell to its closest interior cell (ref. <a class="reference internal" href="#module-cluster_info" title="cluster_info"><code class="xref py py-mod docutils literal"><span class="pre">cluster_info</span></code></a>) defined by a distance (=the smallest number of cells needed for every cut cell to reach one interior cell) and it creates a cluster by grouping all cells that were mapped to the same inner cell.
+The following image shows exactly one cluster, where the blue one inside is the inner cell and the greens are the cells cut by the boundary and clustered with the blue:</p>
+<p><a class="reference internal" href="_images/clustering2.png"><img alt="one_cluster" src="_images/clustering2.png" style="width: 200px; height: 200px;" /></a></p>
+<p>In detail, we are starting with the interior cells and iteratively adding adjacent cut cells to it. This continues until all cut cells are clustered with an interior (and possibly other cut cells). This process can be shown in the below four steps.</p>
+<a class="reference internal image-reference" href="_images/clustering.png"><img alt="alternate text" class="align-center" src="_images/clustering.png" style="width: 650.0px; height: 250.0px;" /></a>
+<p>Given a grid on an artificial domain, the <span class="math">\(H^1\)</span> space on the grid is defined as the function space spanned by all functions of the following type:</p>
+<p>Let <span class="math">\(z_{i,j} = (x_i, y_j)\)</span> denote the vertices of our grid. Let h be the height (which is for now assumed to be the same as the width) of each sqare in our grid <span class="math">\((h = x_{i + 1, j} - x_{i, j})\)</span> for each i, j. We define</p>
+<p><span class="math">\(\phi_{i, j}(x, y) = \begin{cases}
+(x-x_{i-1}) (y-y_{j-1}) /h^2 &amp;\quad\ (x, y)\in [x_{i-1},x_i] \times [y_{j-1},y_j]\\
+(x-x_{i-1}) (y_{j+1}-y) /h^2 &amp;\quad\ (x, y)\in [x_{i-1},x_i] \times [y_j,y_{j+1}]\\
+(x_{i+1}-x) (y-y_{j-1}) /h^2 &amp;\quad\ (x, y)\in [x_i,x_{i+1}] \times [y_{j-1},y_j]\\
+(x_{i+1}-x) (y_{j+1}-y) /h^2 &amp;\quad\ (x, y)\in [x_i,x_{i+1}] \times [y_j,y_{j+1}]\\
+0 &amp;\quad\ \text{otherwise}
+\end{cases}\)</span></p>
+<p>then those <span class="math">\(\phi_{i, j}\)</span> are the basis functions of our <span class="math">\(H^1\)</span> space and each of them is associated to the vertex <span class="math">\(z_{i,j}\)</span> in the obvious way. As each of the basis functions is 0 on all other vertices and 1 on the vertex associated to it, we have for each function <span class="math">\(u\)</span> in our <span class="math">\(H^1\)</span> space:
+<span class="math">\(u(z) = \sum_{i, j}^{N+1} u(z_{i, j}) \phi_{i, j}(z)\)</span>.</p>
+<p>The following image shows such a function <span class="math">\(\phi_{i, j}\)</span> associated to a vertex at (0,0) when <span class="math">\(h\)</span> is 1:</p>
+<p><a class="reference internal" href="_images/basisfunction.png"><img alt="basisfunction" src="_images/basisfunction.png" style="width: 200px; height: 150px;" /></a></p>
+<p>By classifying our degrees of freedom in 3 types: inner, exterior and unused the vector describing out trial functions has the form:</p>
+<p><span class="math">\(u = (u^{in}, u^{ext}, u^{unused})\)</span>,</p>
+<p><a class="reference internal" href="_images/active.png"><img alt="active" src="_images/active.png" style="width: 176px; height: 233px;" /></a></p>
+<p>where <span class="math">\(u^{in}\)</span> corresponds to the degrees of freedom associated to the inner vertices, <span class="math">\(u^{ext}\)</span> to the vertices adjacent to a cut cell but not an inner cell, and <span class="math">\(u^{unused}\)</span> the rest of the vertices. The algorithms now restricts our solutions to those where <span class="math">\(u^{ext}\)</span> is of the form <span class="math">\(u^{ext} = T u^{in}\)</span>, where <span class="math">\(T\)</span> is linear. More specifically for each exterior degree of freedom we selected a close inner cell (using the base cell of the clustering), and define <span class="math">\(u_i\)</span> to be the value of the continuation of the function in the cell given the values of the function on the corners of that interior cell.</p>
+<p><a class="reference internal" href="_images/Nodetocell.png"><img alt="Nodetocell" src="_images/Nodetocell.png" style="width: 421px; height: 197px;" /></a></p>
+<p>where <span class="math">\(N^{out}_h\)</span> are the outer nodes.</p>
+<p>In conclusion, we reduce the problem <span class="math">\(Au = b\)</span>, by imposing restriction to the solution given by what is given in the paper resulting in:</p>
+<p><span class="math">\({\tilde{C^T}}A \tilde{C} = \tilde{C^T} b\)</span>, where <span class="math">\(\tilde{C} = (I, T, 0)^T\)</span>, with <span class="math">\(T\)</span> being the matrix that maps the degress of freedom in N<sup>in</sup> to the degress of freedom of N<sup>out</sup>. Generating the Matrix <span class="math">\(C\)</span> is the aim of the algorithm and the file <a class="reference internal" href="#module-last_step" title="last_step"><code class="xref py py-mod docutils literal"><span class="pre">last_step</span></code></a> implements a method that returns the coefficients of the matrix <span class="math">\(\tilde{C}\)</span> given by index to value pairs (all other coefficients will be 0). The implementation of this method is different depending on whether we have a grid or or a mesh consisting of simplicies.</p>
+</div>
+<div class="section" id="result-and-outlook">
+<h1>Result and Outlook<a class="headerlink" href="#result-and-outlook" title="Permalink to this headline">¶</a></h1>
+<p>In the notebook square_test we tested the algorithm using a simple poisson equation on a circular physical domain on a <cite>N times N</cite> square Grid and compared the results of this new method to the results of the old method, the results are shown in the following table:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="7%" />
+<col width="21%" />
+<col width="26%" />
+<col width="21%" />
+<col width="24%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">N</th>
+<th class="head">Error Old</th>
+<th class="head">Cond Old</th>
+<th class="head">Error New</th>
+<th class="head">Cond New</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>8</td>
+<td>0.041436</td>
+<td>3.9 * 10^7</td>
+<td>0.096531</td>
+<td>1.8 * 10^3</td>
+</tr>
+<tr class="row-odd"><td>10</td>
+<td>0.026746</td>
+<td>2.7 * 10^8</td>
+<td>0.080747</td>
+<td>5.8 * 10^3</td>
+</tr>
+<tr class="row-even"><td>15</td>
+<td>0.012055</td>
+<td>1.1 * 10^4</td>
+<td>0.032030</td>
+<td>1.3 * 10^4</td>
+</tr>
+<tr class="row-odd"><td>20</td>
+<td>0.006842</td>
+<td>1.0 * 10^9</td>
+<td>0.014049</td>
+<td>2.9 * 10^4</td>
+</tr>
+<tr class="row-even"><td>30</td>
+<td>0.003062</td>
+<td>1.1 * 10^9</td>
+<td>0.005649</td>
+<td>9.6 * 10^4</td>
+</tr>
+<tr class="row-odd"><td>100</td>
+<td>0.000278</td>
+<td>1.4 * 10^14</td>
+<td>0.000363</td>
+<td>1.3 * 10^6</td>
+</tr>
+</tbody>
+</table>
+<p>The new method in the tested case above had an error which was between 2 and 3 times larger than the old method but has a much better and well behaved condition number.</p>
+<p>A possible next step would be to make sure the algorithm also for 3D meshes, we tried to write it in a way to be as compatible as possible to the 3D case, but it was not tested.</p>
+<p>Another possible thing to do could be to check whether the algorithm could be extended to other function spaces than to H1 of order 1.</p>
+<div class="section" id="module-ad_info">
+<span id="the-ad-info-module"></span><h2>The <cite>ad_info</cite> module<a class="headerlink" href="#module-ad_info" title="Permalink to this headline">¶</a></h2>
+<p>The ad_info module below gives a new class with information about adjacent faces.       Specifically it gives info about:</p>
+<ol class="loweralpha simple">
+<li>The connection of vertices and faces.</li>
+<li>A list of adjacent faces.</li>
+<li>Adjacent faces of a vertex.</li>
+<li>Two test functions to see in the mesh any adjacent faces or adjacent faces of a vertex.</li>
+</ol>
+<dl class="class">
+<dt id="ad_info.AdInfo">
+<em class="property">class </em><code class="descclassname">ad_info.</code><code class="descname">AdInfo</code><span class="sig-paren">(</span><em>mesh</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ad_info.html#AdInfo"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ad_info.AdInfo" title="Permalink to this definition">¶</a></dt>
+<dd><p>Information about which faces are adjacent.</p>
+<dl class="method">
+<dt id="ad_info.AdInfo.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>mesh</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ad_info.html#AdInfo.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ad_info.AdInfo.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="docutils">
+<dt>Args:</dt>
+<dd>mesh (Mesh from netgen):</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="ad_info.AdInfo.build_f2f">
+<code class="descname">build_f2f</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ad_info.html#AdInfo.build_f2f"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ad_info.AdInfo.build_f2f" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gathers information about connection between edges to faces first,
+and faces to faces afterwards in the mesh. A helper function for the
+constructor, don’t call manually.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ad_info.AdInfo.build_v2f">
+<code class="descname">build_v2f</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ad_info.html#AdInfo.build_v2f"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ad_info.AdInfo.build_v2f" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gathers information about connection between verticies to faces in the
+mesh. A helper function for the constructor, don’t call manually.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ad_info.AdInfo.get_ajacent_faces">
+<code class="descname">get_ajacent_faces</code><span class="sig-paren">(</span><em>face_index</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ad_info.html#AdInfo.get_ajacent_faces"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ad_info.AdInfo.get_ajacent_faces" title="Permalink to this definition">¶</a></dt>
+<dd><p>Function that gives list of adjacent faces of a face.
+Args:
+face_index (int): Index of the face</p>
+<p>Returns: Adjacent faces.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ad_info.AdInfo.get_vertex_ajacent_faces">
+<code class="descname">get_vertex_ajacent_faces</code><span class="sig-paren">(</span><em>vertex_index</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ad_info.html#AdInfo.get_vertex_ajacent_faces"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ad_info.AdInfo.get_vertex_ajacent_faces" title="Permalink to this definition">¶</a></dt>
+<dd><p>Function for the adjacent faces of a vertex.
+Args:
+vertex_index (int): Index of the vertex</p>
+<p>Returns: Adjacent faces of the vertex.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ad_info.AdInfo.test_f2f">
+<code class="descname">test_f2f</code><span class="sig-paren">(</span><em>face_index</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ad_info.html#AdInfo.test_f2f"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ad_info.AdInfo.test_f2f" title="Permalink to this definition">¶</a></dt>
+<dd><p>Test function to visualize the result of the get_ajacent_faces function.
+Args:
+face_index (int): Index of a face</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ad_info.AdInfo.test_v2f">
+<code class="descname">test_v2f</code><span class="sig-paren">(</span><em>vertex_index</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ad_info.html#AdInfo.test_v2f"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ad_info.AdInfo.test_v2f" title="Permalink to this definition">¶</a></dt>
+<dd><p>Test function to visualize the result of the get_vertex_ajacent_faces.
+Args:
+vertex_index (int): Index of a vertex</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-cluster_info">
+<span id="the-cluster-info-module"></span><h2>The <cite>cluster_info</cite> module<a class="headerlink" href="#module-cluster_info" title="Permalink to this headline">¶</a></h2>
+<p>This is the basic module of the algorithm to build the clusters. Firstly, it defines a new class to generate the clusters and another function to give the distance between the cells. The idea is to build a cluster between an inner cell and neighbour cut cells having the smallest distance. There are also two functions defined for the visualization of clusters created.</p>
+<dl class="function">
+<dt id="cluster_info.copy_bitarray">
+<code class="descclassname">cluster_info.</code><code class="descname">copy_bitarray</code><span class="sig-paren">(</span><em>a</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#copy_bitarray"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.copy_bitarray" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a copy of a BitArray structure</p>
+<dl class="docutils">
+<dt>Args:</dt>
+<dd>a (BitArray):</dd>
+<dt>Returns:</dt>
+<dd>BitArray, A copy of a</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="cluster_info.CusterInfo">
+<em class="property">class </em><code class="descclassname">cluster_info.</code><code class="descname">CusterInfo</code><span class="sig-paren">(</span><em>ad_info</em>, <em>cut_info</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#CusterInfo"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.CusterInfo" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class to generate the clusters when doing unfitted FEM</p>
+<dl class="method">
+<dt id="cluster_info.CusterInfo.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>ad_info</em>, <em>cut_info</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#CusterInfo.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.CusterInfo.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constructor</p>
+<dl class="docutils">
+<dt>Arguments:</dt>
+<dd><dl class="first last docutils">
+<dt>ad_info (AdInfo):</dt>
+<dd>Usually created via AdInfo(mesh), where mesh is cut_info.Mesh()</dd>
+<dt>cut_info (CutInfo):</dt>
+<dd>The cut info to which to compute the clusters.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="cluster_info.CusterInfo.element_corners">
+<code class="descname">element_corners</code><span class="sig-paren">(</span><em>e_id</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#CusterInfo.element_corners"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.CusterInfo.element_corners" title="Permalink to this definition">¶</a></dt>
+<dd><p>returns a list of all verticies adjacent to an element</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cluster_info.CusterInfo.distance_cell_to_cell">
+<code class="descname">distance_cell_to_cell</code><span class="sig-paren">(</span><em>f_id1</em>, <em>f_id2</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#CusterInfo.distance_cell_to_cell"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.CusterInfo.distance_cell_to_cell" title="Permalink to this definition">¶</a></dt>
+<dd><p>Helper method to compute the distance of two elements, just
+computes the distance between the middlepoints of the two elements.</p>
+<dl class="docutils">
+<dt>Args:</dt>
+<dd><dl class="first last docutils">
+<dt>f_id1 (int):</dt>
+<dd>The index of the first Element</dd>
+<dt>f_id2 (int):</dt>
+<dd>The index of the second Element</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>float. The distance of the two Elements</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="cluster_info.CusterInfo.GetFacesOfType">
+<code class="descname">GetFacesOfType</code><span class="sig-paren">(</span><em>t</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#CusterInfo.GetFacesOfType"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.CusterInfo.GetFacesOfType" title="Permalink to this definition">¶</a></dt>
+<dd><p>wrapper for cut_info.GetElementsOfType that uses the same
+ordering as used by mesh[NodeId(FACE, id)]</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cluster_info.CusterInfo.build_clusters">
+<code class="descname">build_clusters</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#CusterInfo.build_clusters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.CusterInfo.build_clusters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Helper method to do the actual work, only called by the constructor
+of this class</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cluster_info.CusterInfo.get_cluster">
+<code class="descname">get_cluster</code><span class="sig-paren">(</span><em>face_id</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#CusterInfo.get_cluster"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.CusterInfo.get_cluster" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the id of the cluster the Element belongs to, that id
+is the same as the Element id of the single uncut element in that cluster.</p>
+<dl class="docutils">
+<dt>Args:</dt>
+<dd><dl class="first last docutils">
+<dt>face_id (int):</dt>
+<dd>The index of the element</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>int. The index of the cluster.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="cluster_info.CusterInfo.draw_clusters_inone">
+<code class="descname">draw_clusters_inone</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#CusterInfo.draw_clusters_inone"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.CusterInfo.draw_clusters_inone" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tries to draw all clusters in one image. Due to the limited
+number of colors, this will not always work very well.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cluster_info.CusterInfo.draw_cluster">
+<code class="descname">draw_cluster</code><span class="sig-paren">(</span><em>f_id</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#CusterInfo.draw_cluster"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.CusterInfo.draw_cluster" title="Permalink to this definition">¶</a></dt>
+<dd><p>Draws the cluster with the given id, that is the id of the
+unique uncut element in that cluster</p>
+<dl class="docutils">
+<dt>Args:</dt>
+<dd><dl class="first last docutils">
+<dt>face_id (int):</dt>
+<dd>The index of the element</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="cluster_info.CusterInfo.draw_clusters">
+<code class="descname">draw_clusters</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#CusterInfo.draw_clusters"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.CusterInfo.draw_clusters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Draws all calculated clusters, each in a diffent image
+named ‘“cluster&lt;custer_id&gt;(&lt;custer_size&gt;)’</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="cluster_info.CusterInfo.get_posible_interpolation_faces">
+<code class="descname">get_posible_interpolation_faces</code><span class="sig-paren">(</span><em>vertex_id</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#CusterInfo.get_posible_interpolation_faces"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.CusterInfo.get_posible_interpolation_faces" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list of all Elements that could be used to interpolate the
+DOF associated to the vertex with the given id.</p>
+<dl class="docutils">
+<dt>Args:</dt>
+<dd><dl class="first last docutils">
+<dt>vertex_id (int):</dt>
+<dd>The index of the vertex</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>list of int. List of indices of Elements.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="cluster_info.CusterInfo.get_interpolation_face">
+<code class="descname">get_interpolation_face</code><span class="sig-paren">(</span><em>vertex_id</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/cluster_info.html#CusterInfo.get_interpolation_face"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#cluster_info.CusterInfo.get_interpolation_face" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the Elements that should be used to interpolate the given vertexs</p>
+<dl class="docutils">
+<dt>Args:</dt>
+<dd><dl class="first last docutils">
+<dt>vertex_id (int):</dt>
+<dd>The index of the vertex</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>int. Index of the element.</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-last_step">
+<span id="the-last-step-module"></span><h2>The <cite>last_step</cite> module<a class="headerlink" href="#module-last_step" title="Permalink to this headline">¶</a></h2>
+<p>The last step is to interpolate vertices on differnet mesh types, e.g. 2D squares, 2D simplices, 3D simplices, 3D squares.
+The 3D case is not tested.</p>
+<dl class="class">
+<dt id="last_step.MeshType">
+<em class="property">class </em><code class="descclassname">last_step.</code><code class="descname">MeshType</code><a class="reference internal" href="_modules/last_step.html#MeshType"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#last_step.MeshType" title="Permalink to this definition">¶</a></dt>
+<dd><p>An enumeration.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="last_step.VertexCoefficient">
+<em class="property">class </em><code class="descclassname">last_step.</code><code class="descname">VertexCoefficient</code><span class="sig-paren">(</span><em>vertex_id</em>, <em>coefficient</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/last_step.html#VertexCoefficient"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#last_step.VertexCoefficient" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class that contains information about which coefficients are
+associated to which vertex when interpolating a certain vertex.</p>
+<p>Attributes:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>vertex_id (int):</dt>
+<dd>the index of the Vertex</dd>
+<dt>coefficient (float):</dt>
+<dd>the associated coefficent</dd>
+</dl>
+</div></blockquote>
+<dl class="method">
+<dt id="last_step.VertexCoefficient.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>vertex_id</em>, <em>coefficient</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/last_step.html#VertexCoefficient.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#last_step.VertexCoefficient.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constrtucts a VertexCoefficient</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="last_step.LastStep">
+<em class="property">class </em><code class="descclassname">last_step.</code><code class="descname">LastStep</code><span class="sig-paren">(</span><em>mesh</em>, <em>cut_info</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/last_step.html#LastStep"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#last_step.LastStep" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class to interpolate vertices</p>
+<dl class="method">
+<dt id="last_step.LastStep.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>mesh</em>, <em>cut_info</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/last_step.html#LastStep.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#last_step.LastStep.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constructor</p>
+<dl class="docutils">
+<dt>Args:</dt>
+<dd><dl class="first last docutils">
+<dt>mesh (Mesh):</dt>
+<dd>a netgen 2d mesh object for which we want to compute</dd>
+<dt>cut_info (CutInfo):</dt>
+<dd>the cut info to which to compute the clusters.</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="last_step.LastStep.get_coefficients">
+<code class="descname">get_coefficients</code><span class="sig-paren">(</span><em>vertex_id</em>, <em>face_id</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/last_step.html#LastStep.get_coefficients"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#last_step.LastStep.get_coefficients" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates the coeffients to interpolate the vertex using an H1
+function of order 1 on the given Element.
+Assumes a 2D space with square Elements.</p>
+<p>Args:</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>vertex_id (int):</dt>
+<dd>The index of the vertex that will be interpolated</dd>
+</dl>
+<p>face_id (int): the index of the element where the H1 function is on</p>
+</div></blockquote>
+<dl class="docutils">
+<dt>Returns:</dt>
+<dd>list of VertexCoefficient.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="last_step.LastStep.do_squares_2D">
+<code class="descname">do_squares_2D</code><span class="sig-paren">(</span><em>vertex_id</em>, <em>face_id</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/last_step.html#LastStep.do_squares_2D"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#last_step.LastStep.do_squares_2D" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates the coeffients to interpolate the vertex using an H1
+function of order 1 on the given Element.
+Assumes a 2D space with square Elements.</p>
+<dl class="docutils">
+<dt>Args:</dt>
+<dd><dl class="first last docutils">
+<dt>vertex_id (int):</dt>
+<dd>The index of the vertex that will be interpolated</dd>
+<dt>face_id (int):</dt>
+<dd>The index of the element where the H1 function is on</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>list of VertexCoefficient.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="last_step.LastStep.do_simplices_2D">
+<code class="descname">do_simplices_2D</code><span class="sig-paren">(</span><em>vertex_id</em>, <em>face_id</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/last_step.html#LastStep.do_simplices_2D"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#last_step.LastStep.do_simplices_2D" title="Permalink to this definition">¶</a></dt>
+<dd><p>Claulates the coeffients to interpolate the vertex using a H1
+function of order 1 on the given Element.
+Assumes a 2D space with triangular Elements.</p>
+<dl class="docutils">
+<dt>Args:</dt>
+<dd><dl class="first last docutils">
+<dt>vertex_id (int):</dt>
+<dd>The index of the vertex that will be interpolated</dd>
+<dt>face_id (int):</dt>
+<dd>The index of the element where the H1 function is on</dd>
+</dl>
+</dd>
+<dt>Returns:</dt>
+<dd>list of VertexCoefficient.</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="the-ad-info-test-ipynb-notebook">
+<h2>The <cite>ad_info_test.ipynb</cite> notebook<a class="headerlink" href="#the-ad-info-test-ipynb-notebook" title="Permalink to this headline">¶</a></h2>
+<p>Tests the <cite>AdInfo</cite> and <cite>CusterInfo</cite> classes</p>
+</div>
+<div class="section" id="the-square-test-ipynb-notebook">
+<h2>The <cite>square_test.ipynb</cite> notebook<a class="headerlink" href="#the-square-test-ipynb-notebook" title="Permalink to this headline">¶</a></h2>
+<p>The notebook that runs all the modules, shows the clusters, clulcates the solution, By default it tests the algorithm on a aquare grid but it can also be changed to testing a simpled mesh.</p>
+</div>
+<div class="section" id="the-strange-behaviour-test-ipynb-notebook">
+<h2>The <cite>strange_behaviour_test.ipynb</cite> notebook<a class="headerlink" href="#the-strange-behaviour-test-ipynb-notebook" title="Permalink to this headline">¶</a></h2>
+<p>This file documents all unexpected behvior of the netgen/ngsolve library that caused us the most problems during the implementation.</p>
+</div>
+</div>
+<div class="section" id="literature">
+<h1>Literature<a class="headerlink" href="#literature" title="Permalink to this headline">¶</a></h1>
+<table border="1" class="docutils">
+<colgroup>
+<col width="41%" />
+<col width="54%" />
+<col width="5%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td rowspan="2">Santiago Badia,
+Francesc Verdugo,
+Alberto F. Martin</td>
+<td>The aggregated unfitted finite element method for elliptic problems</td>
+<td>2017</td>
+</tr>
+<tr class="row-even"><td><a class="reference external" href="https://www.sciencedirect.com/science/article/pii/S0045782518301476">https://www.sciencedirect.com/science/article/pii/S0045782518301476</a></td>
+<td>&#160;</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></li>
+<li><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></li>
+<li><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></li>
+</ul>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="#">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Aggregated Unfitted FEM’s documentation!</a></li>
+<li><a class="reference internal" href="#motivation">Motivation</a></li>
+<li><a class="reference internal" href="#implementation">Implementation</a></li>
+<li><a class="reference internal" href="#result-and-outlook">Result and Outlook</a><ul>
+<li><a class="reference internal" href="#module-ad_info">The <cite>ad_info</cite> module</a></li>
+<li><a class="reference internal" href="#module-cluster_info">The <cite>cluster_info</cite> module</a></li>
+<li><a class="reference internal" href="#module-last_step">The <cite>last_step</cite> module</a></li>
+<li><a class="reference internal" href="#the-ad-info-test-ipynb-notebook">The <cite>ad_info_test.ipynb</cite> notebook</a></li>
+<li><a class="reference internal" href="#the-square-test-ipynb-notebook">The <cite>square_test.ipynb</cite> notebook</a></li>
+<li><a class="reference internal" href="#the-strange-behaviour-test-ipynb-notebook">The <cite>strange_behaviour_test.ipynb</cite> notebook</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#literature">Literature</a></li>
+<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Daniel Draeger, Georgios Kypros.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.7</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

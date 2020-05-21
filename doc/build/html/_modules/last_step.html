@@ -1,0 +1,289 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>last_step &#8212; Practical Course  documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for last_step</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;The last step is to interpolate vertices on differnet mesh types, e.g. 2D squares, 2D simplices, 3D simplices, 3D squares.</span>
+<span class="sd">The 3D case is not tested.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># ngsolve stuff</span>
+<span class="kn">from</span> <span class="nn">ngsolve</span> <span class="k">import</span> <span class="o">*</span>
+<span class="c1"># Basic geometry features (for the background mesh)</span>
+<span class="kn">from</span> <span class="nn">netgen.geom2d</span> <span class="k">import</span> <span class="n">SplineGeometry</span>
+<span class="c1"># Visualization</span>
+<span class="kn">from</span> <span class="nn">ngsolve.internal</span> <span class="k">import</span> <span class="o">*</span>
+<span class="c1"># Basic xfem functionality</span>
+<span class="kn">from</span> <span class="nn">xfem</span> <span class="k">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">enum</span> <span class="k">import</span> <span class="n">Enum</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<div class="viewcode-block" id="MeshType"><a class="viewcode-back" href="../index.html#last_step.MeshType">[docs]</a><span class="k">class</span> <span class="nc">MeshType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+	<span class="n">squares_2D</span> <span class="o">=</span> <span class="mi">0</span>
+	<span class="n">simplices_2D</span> <span class="o">=</span> <span class="mi">1</span>
+	<span class="n">squares_3D</span> <span class="o">=</span> <span class="mi">2</span>
+	<span class="n">simplices_3D</span> <span class="o">=</span> <span class="mi">3</span></div>
+
+<div class="viewcode-block" id="VertexCoefficient"><a class="viewcode-back" href="../index.html#last_step.VertexCoefficient">[docs]</a><span class="k">class</span> <span class="nc">VertexCoefficient</span><span class="p">:</span>
+	<span class="sd">&quot;&quot;&quot;Class that contains information about which coefficients are</span>
+<span class="sd">	associated to which vertex when interpolating a certain vertex.</span>
+
+<span class="sd">	Attributes:</span>
+<span class="sd">	</span>
+<span class="sd">		vertex_id (int):</span>
+<span class="sd">			the index of the Vertex</span>
+
+<span class="sd">		coefficient (float):</span>
+<span class="sd">			the associated coefficent</span>
+
+<span class="sd">	&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="VertexCoefficient.__init__"><a class="viewcode-back" href="../index.html#last_step.VertexCoefficient.__init__">[docs]</a>	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">,</span> <span class="n">coefficient</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;Constrtucts a VertexCoefficient&quot;&quot;&quot;</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">vertex_id</span> <span class="o">=</span> <span class="n">vertex_id</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">coefficient</span> <span class="o">=</span> <span class="n">coefficient</span></div>
+	<span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">return</span> <span class="s2">&quot;vertex(id:&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vertex_id</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;,cof:&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coefficient</span><span class="p">)</span><span class="o">+</span> <span class="s2">&quot;)&quot;</span></div>
+
+<div class="viewcode-block" id="LastStep"><a class="viewcode-back" href="../index.html#last_step.LastStep">[docs]</a><span class="k">class</span> <span class="nc">LastStep</span><span class="p">:</span>
+	<span class="sd">&quot;&quot;&quot;Class to interpolate vertices</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="LastStep.__init__"><a class="viewcode-back" href="../index.html#last_step.LastStep.__init__">[docs]</a>	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mesh</span><span class="p">,</span> <span class="n">cut_info</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;Constructor</span>
+
+<span class="sd">		Args:</span>
+<span class="sd">			mesh (Mesh):</span>
+<span class="sd">				a netgen 2d mesh object for which we want to compute</span>
+<span class="sd">			cut_info (CutInfo):</span>
+<span class="sd">				the cut info to which to compute the clusters.</span>
+
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">mesh</span> <span class="o">=</span> <span class="n">mesh</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">cut_info</span> <span class="o">=</span> <span class="n">cut_info</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">mesh_type</span> <span class="o">=</span> <span class="n">MeshType</span><span class="o">.</span><span class="n">simplices_2D</span>
+
+		<span class="n">is_3D</span> <span class="o">=</span> <span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">)</span>
+		<span class="n">num_corners</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">NodeId</span><span class="p">(</span><span class="n">FACE</span><span class="p">,</span><span class="mi">0</span><span class="p">)]</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+		<span class="k">if</span> <span class="n">is_3D</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">num_corners</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">mesh_type</span> <span class="o">=</span> <span class="n">MeshType</span><span class="o">.</span><span class="n">simplices_3D</span>
+			<span class="k">if</span> <span class="n">num_corners</span> <span class="o">==</span> <span class="mi">8</span><span class="p">:</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">mesh_type</span> <span class="o">=</span> <span class="n">MeshType</span><span class="o">.</span><span class="n">squares_3D</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">num_corners</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">mesh_type</span> <span class="o">=</span> <span class="n">MeshType</span><span class="o">.</span><span class="n">simplices_2D</span>
+			<span class="k">if</span> <span class="n">num_corners</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">mesh_type</span> <span class="o">=</span> <span class="n">MeshType</span><span class="o">.</span><span class="n">squares_2D</span></div>
+
+	<span class="k">def</span> <span class="nf">element_corners</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">e_id</span><span class="p">):</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">NodeId</span><span class="p">(</span><span class="n">CELL</span><span class="p">,</span> <span class="n">e_id</span><span class="p">)]</span><span class="o">.</span><span class="n">vertices</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">NodeId</span><span class="p">(</span><span class="n">FACE</span><span class="p">,</span> <span class="n">e_id</span><span class="p">)]</span><span class="o">.</span><span class="n">vertices</span>
+
+<div class="viewcode-block" id="LastStep.get_coefficients"><a class="viewcode-back" href="../index.html#last_step.LastStep.get_coefficients">[docs]</a>	<span class="k">def</span> <span class="nf">get_coefficients</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">,</span> <span class="n">face_id</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Calculates the coeffients to interpolate the vertex using an H1</span>
+<span class="sd">		function of order 1 on the given Element.</span>
+<span class="sd">		Assumes a 2D space with square Elements.</span>
+
+<span class="sd">		Args:</span>
+
+<span class="sd">			vertex_id (int):</span>
+<span class="sd">				The index of the vertex that will be interpolated</span>
+
+<span class="sd">			face_id (int): the index of the element where the H1 function is on</span>
+
+<span class="sd">		Returns:</span>
+<span class="sd">			list of VertexCoefficient. </span>
+
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh_type</span> <span class="o">==</span> <span class="n">MeshType</span><span class="o">.</span><span class="n">simplices_3D</span><span class="p">:</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_simplices_3D</span><span class="p">(</span><span class="n">vertex_id</span><span class="p">,</span> <span class="n">face_id</span><span class="p">)</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh_type</span> <span class="o">==</span> <span class="n">MeshType</span><span class="o">.</span><span class="n">squares_3D</span><span class="p">:</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_squares_3D</span><span class="p">(</span><span class="n">vertex_id</span><span class="p">,</span> <span class="n">face_id</span><span class="p">)</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh_type</span> <span class="o">==</span> <span class="n">MeshType</span><span class="o">.</span><span class="n">simplices_2D</span><span class="p">:</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_simplices_2D</span><span class="p">(</span><span class="n">vertex_id</span><span class="p">,</span> <span class="n">face_id</span><span class="p">)</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh_type</span> <span class="o">==</span> <span class="n">MeshType</span><span class="o">.</span><span class="n">squares_2D</span><span class="p">:</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_squares_2D</span><span class="p">(</span><span class="n">vertex_id</span><span class="p">,</span> <span class="n">face_id</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="LastStep.do_squares_2D"><a class="viewcode-back" href="../index.html#last_step.LastStep.do_squares_2D">[docs]</a>	<span class="k">def</span> <span class="nf">do_squares_2D</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">,</span> <span class="n">face_id</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Calculates the coeffients to interpolate the vertex using an H1</span>
+<span class="sd">		function of order 1 on the given Element.</span>
+<span class="sd">		Assumes a 2D space with square Elements.</span>
+
+<span class="sd">		Args:</span>
+<span class="sd">			vertex_id (int):</span>
+<span class="sd">				The index of the vertex that will be interpolated</span>
+
+<span class="sd">			face_id (int):</span>
+<span class="sd">				The index of the element where the H1 function is on</span>
+
+<span class="sd">		Returns:</span>
+<span class="sd">			list of VertexCoefficient.</span>
+
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_squares</span><span class="p">(</span><span class="n">vertex_id</span><span class="p">,</span> <span class="n">face_id</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="LastStep.do_simplices_2D"><a class="viewcode-back" href="../index.html#last_step.LastStep.do_simplices_2D">[docs]</a>	<span class="k">def</span> <span class="nf">do_simplices_2D</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">,</span> <span class="n">face_id</span><span class="p">):</span>
+		<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		Claulates the coeffients to interpolate the vertex using a H1</span>
+<span class="sd">		function of order 1 on the given Element.</span>
+<span class="sd">		Assumes a 2D space with triangular Elements.</span>
+
+<span class="sd">		Args:</span>
+<span class="sd">			vertex_id (int):</span>
+<span class="sd">				The index of the vertex that will be interpolated</span>
+
+<span class="sd">			face_id (int):</span>
+<span class="sd">				The index of the element where the H1 function is on</span>
+
+<span class="sd">		Returns:</span>
+<span class="sd">			list of VertexCoefficient. </span>
+
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">def</span> <span class="nf">one_corner</span><span class="p">(</span><span class="n">p_dest</span><span class="p">,</span> <span class="n">point1</span><span class="p">,</span> <span class="n">point2</span><span class="p">,</span> <span class="n">point3</span><span class="p">):</span>
+			<span class="n">mat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">1</span><span class="p">,</span> <span class="n">point1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">point1</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span>
+			           <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">point2</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">point2</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span> \
+		   	           <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">point3</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">point3</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span> \
+			<span class="p">])</span>
+			<span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">mat</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+			<span class="k">return</span> <span class="n">res</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">p_dest</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">res</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">p_dest</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">res</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+		<span class="n">vertex_loc</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">NodeId</span><span class="p">(</span><span class="n">VERTEX</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">)]</span><span class="o">.</span><span class="n">point</span>
+		<span class="n">corners</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">element_corners</span><span class="p">(</span><span class="n">face_id</span><span class="p">)]</span>
+		<span class="k">return</span> <span class="p">[</span> \
+			<span class="n">VertexCoefficient</span><span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">nr</span><span class="p">,</span> <span class="n">one_corner</span><span class="p">(</span><span class="n">vertex_loc</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">)),</span> \
+			<span class="n">VertexCoefficient</span><span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">nr</span><span class="p">,</span> <span class="n">one_corner</span><span class="p">(</span><span class="n">vertex_loc</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">)),</span> \
+			<span class="n">VertexCoefficient</span><span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">nr</span><span class="p">,</span> <span class="n">one_corner</span><span class="p">(</span><span class="n">vertex_loc</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">)),</span> \
+		<span class="p">]</span></div>
+
+	<span class="k">def</span> <span class="nf">do_squares</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">,</span> <span class="n">face_id</span><span class="p">,</span> <span class="n">ndims</span><span class="p">):</span>
+		<span class="n">n_corners</span> <span class="o">=</span> <span class="mi">2</span><span class="o">**</span><span class="n">ndims</span>
+		<span class="n">n_corners_half</span> <span class="o">=</span> <span class="mi">2</span><span class="o">**</span><span class="p">(</span><span class="n">ndims</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+		<span class="n">corners</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">element_corners</span><span class="p">(</span><span class="n">face_id</span><span class="p">)]</span>
+		<span class="n">vertex_loc</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">NodeId</span><span class="p">(</span><span class="n">VERTEX</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">)]</span><span class="o">.</span><span class="n">point</span>
+
+		<span class="c1">#validate input, in particular the algorithm assumes</span>
+		<span class="c1">#the vertices to be listed in a certain order</span>
+		<span class="k">def</span> <span class="nf">is_opposite_corner</span><span class="p">(</span><span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">):</span>
+			<span class="k">for</span> <span class="n">a1</span><span class="p">,</span> <span class="n">a2</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">):</span>
+				<span class="k">if</span> <span class="n">a1</span> <span class="o">==</span> <span class="n">a2</span><span class="p">:</span>
+					<span class="k">return</span> <span class="kc">False</span>
+			<span class="k">return</span> <span class="kc">True</span>
+		<span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">corners</span><span class="p">)</span> <span class="o">==</span> <span class="n">n_corners</span>
+		<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_corners_half</span><span class="p">):</span>
+			<span class="k">assert</span> <span class="n">is_opposite_corner</span><span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="n">n_corners_half</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">)</span>
+
+		<span class="n">res</span> <span class="o">=</span> <span class="p">[]</span>
+		<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_corners</span><span class="p">):</span>
+			<span class="n">i_opp</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="n">n_corners_half</span><span class="p">)</span> <span class="o">%</span> <span class="n">n_corners</span>
+			<span class="n">point</span> <span class="o">=</span> <span class="n">corners</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">point</span>
+			<span class="n">point_opp</span> <span class="o">=</span> <span class="n">corners</span><span class="p">[</span><span class="n">i_opp</span><span class="p">]</span><span class="o">.</span><span class="n">point</span>
+			<span class="n">coeff</span> <span class="o">=</span> <span class="mi">1</span>
+			<span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ndims</span><span class="p">):</span>
+				<span class="n">coeff</span> <span class="o">*=</span> <span class="p">((</span><span class="n">vertex_loc</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">-</span> <span class="n">point_opp</span><span class="p">[</span><span class="n">dim</span><span class="p">])</span><span class="o">/</span><span class="p">(</span><span class="n">point</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">-</span> <span class="n">point_opp</span><span class="p">[</span><span class="n">dim</span><span class="p">]))</span>
+			<span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">VertexCoefficient</span><span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">nr</span><span class="p">,</span> <span class="n">coeff</span><span class="p">))</span>
+		<span class="k">return</span> <span class="n">res</span>
+
+	<span class="k">def</span> <span class="nf">do_squares_3D</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">,</span> <span class="n">face_id</span><span class="p">):</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">do_squares</span><span class="p">(</span><span class="n">vertex_id</span><span class="p">,</span> <span class="n">face_id</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+	
+	<span class="k">def</span> <span class="nf">do_simplices_3D</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">,</span> <span class="n">face_id</span><span class="p">):</span>
+		<span class="k">def</span> <span class="nf">one_corner</span><span class="p">(</span><span class="n">p_dest</span><span class="p">,</span> <span class="n">point1</span><span class="p">,</span> <span class="n">point2</span><span class="p">,</span> <span class="n">point3</span><span class="p">,</span> <span class="n">point4</span><span class="p">):</span>
+			<span class="c1"># f(x) =</span>
+			<span class="n">mat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">1</span><span class="p">,</span> <span class="n">point1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">point1</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">point1</span><span class="p">[</span><span class="mi">2</span><span class="p">]],</span>
+			           <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">point2</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">point2</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">point2</span><span class="p">[</span><span class="mi">2</span><span class="p">]],</span> \
+		   	           <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">point3</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">point3</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">point3</span><span class="p">[</span><span class="mi">2</span><span class="p">]],</span> \
+		   	           <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">point4</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">point4</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">point4</span><span class="p">[</span><span class="mi">2</span><span class="p">]],</span> \
+			<span class="p">])</span>
+			<span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+			<span class="n">res</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">mat</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+			<span class="k">return</span> <span class="n">res</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">p_dest</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">res</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">p_dest</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">res</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">p_dest</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">res</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+		<span class="n">vertex_loc</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">NodeId</span><span class="p">(</span><span class="n">VERTEX</span><span class="p">,</span> <span class="n">vertex_id</span><span class="p">)]</span><span class="o">.</span><span class="n">point</span>
+		<span class="n">corners</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">element_corners</span><span class="p">(</span><span class="n">face_id</span><span class="p">)]</span>
+		<span class="k">return</span> <span class="p">[</span> \
+			<span class="n">VertexCoefficient</span><span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">nr</span><span class="p">,</span> <span class="n">one_corner</span><span class="p">(</span><span class="n">vertex_loc</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">)),</span> \
+			<span class="n">VertexCoefficient</span><span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">nr</span><span class="p">,</span> <span class="n">one_corner</span><span class="p">(</span><span class="n">vertex_loc</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">)),</span> \
+			<span class="n">VertexCoefficient</span><span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">nr</span><span class="p">,</span> <span class="n">one_corner</span><span class="p">(</span><span class="n">vertex_loc</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">)),</span> \
+			<span class="n">VertexCoefficient</span><span class="p">(</span><span class="n">corners</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">nr</span><span class="p">,</span> <span class="n">one_corner</span><span class="p">(</span><span class="n">vertex_loc</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">,</span> <span class="n">corners</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">point</span><span class="p">)),</span> \
+		<span class="p">]</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Daniel Draeger, Georgios Kypros.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.7</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

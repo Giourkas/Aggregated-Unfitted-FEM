@@ -1,0 +1,97 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Motivation &#8212; Practical Course  documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="motivation">
+<h1>Motivation<a class="headerlink" href="#motivation" title="Permalink to this headline">¶</a></h1>
+<p>The finite element method is a common way to numerically solve differential equations: One generates a mesh on the physical domain <span class="math">\(\Omega\)</span> of the function space and restricts the function space to the H<sup>1</sup> space associated to that mesh which is in the simplest case defined to have one basis function per mesh vertex which is defined in a way that it is zero on all other vertices and has compact support around that vertex. Solutions of differential equations can then be formulated as the f in H<sup>1</sup> such that <span class="math">\(L(f, g) = K(g)\)</span> for all g in H<sup>1</sup> with a fixed bilinear form L and a linear form <span class="math">\(K\)</span>. By computing <span class="math">\(K\)</span>, and <span class="math">\(L\)</span> on all basis functions the differential equations then become linear equations of the form <span class="math">\(A u = b\)</span>.</p>
+<p>Often it is difficult to find a good mesh for a given space <span class="math">\(\Omega\)</span> but easy to generate mesh on a larger space  <span class="math">\(\Omega_{art} \supset \Omega\)</span> . Using the same method as described before is still possible and is in this case called the unfitted finite element method. However, these techniques are prone to severe ill conditioning problems that obstruct the efficient use of iterative Krylov methods and, in consequence, hinders the practical usage of unfitted methods for realistic large scale applications. The work by Badia, Verdugo and Martin presents a technique which we implement, called the aggregated unfitted finite element method, that addresses such conditioning problems by constructing enhanced finite element spaces based on a cell aggregation technique. The mathematical analysis of the new method states that the condition number of the resulting linear system matrix scales as in standard finite elements for body-fitted meshes, without being affected by small cut cells, and that the method leads to the optimal finite element convergence order.</p>
+<p>For most of the unfitted FE techniques, the condition number of the discrete linear system does not only depend on the characteristic element size of the background mesh, but also on the characteristic size of the cut cells, which can be arbitrary small and have arbitrarily high aspect ratios. The main goal of this work is to implement this enhanced unfitted FE formulation that fixes the problems associated with cut cells. The algorithm does achieve condition numbers that scale only with the element size of the background mesh in the same way as in standard FE methods for body-fitted meshes.</p>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/Motivation.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Daniel Draeger, Georgios Kypros.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.7</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+      |
+      <a href="_sources/Motivation.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

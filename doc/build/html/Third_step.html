@@ -1,0 +1,174 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Result and Outlook &#8212; Practical Course  documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <p>Given a grid on an artificial domain, the <span class="math">\(H^1\)</span> space on the grid is defined as the function space spanned by all functions of the following type:</p>
+<p>Let <span class="math">\(z_{i,j} = (x_i, y_j)\)</span> denote the vertices of our grid. Let h be the height (which is for now assumed to be the same as the width) of each sqare in our grid <span class="math">\((h = x_{i + 1, j} - x_{i, j})\)</span> for each i, j. We define</p>
+<p><span class="math">\(\phi_{i, j}(x, y) = \begin{cases}
+(x-x_{i-1}) (y-y_{j-1}) /h^2 &amp;\quad\ (x, y)\in [x_{i-1},x_i] \times [y_{j-1},y_j]\\
+(x-x_{i-1}) (y_{j+1}-y) /h^2 &amp;\quad\ (x, y)\in [x_{i-1},x_i] \times [y_j,y_{j+1}]\\
+(x_{i+1}-x) (y-y_{j-1}) /h^2 &amp;\quad\ (x, y)\in [x_i,x_{i+1}] \times [y_{j-1},y_j]\\
+(x_{i+1}-x) (y_{j+1}-y) /h^2 &amp;\quad\ (x, y)\in [x_i,x_{i+1}] \times [y_j,y_{j+1}]\\
+0 &amp;\quad\ \text{otherwise}
+\end{cases}\)</span></p>
+<p>then those <span class="math">\(\phi_{i, j}\)</span> are the basis functions of our <span class="math">\(H^1\)</span> space and each of them is associated to the vertex <span class="math">\(z_{i,j}\)</span> in the obvious way. As each of the basis functions is 0 on all other vertices and 1 on the vertex associated to it, we have for each function <span class="math">\(u\)</span> in our <span class="math">\(H^1\)</span> space:
+<span class="math">\(u(z) = \sum_{i, j}^{N+1} u(z_{i, j}) \phi_{i, j}(z)\)</span>.</p>
+<p>The following image shows such a function <span class="math">\(\phi_{i, j}\)</span> associated to a vertex at (0,0) when <span class="math">\(h\)</span> is 1:</p>
+<p><a class="reference internal" href="_images/basisfunction.png"><img alt="basisfunction" src="_images/basisfunction.png" style="width: 200px; height: 150px;" /></a></p>
+<p>By classifying our degrees of freedom in 3 types: inner, exterior and unused the vector describing out trial functions has the form:</p>
+<p><span class="math">\(u = (u^{in}, u^{ext}, u^{unused})\)</span>,</p>
+<p><a class="reference internal" href="_images/active.png"><img alt="active" src="_images/active.png" style="width: 176px; height: 233px;" /></a></p>
+<p>where <span class="math">\(u^{in}\)</span> corresponds to the degrees of freedom associated to the inner vertices, <span class="math">\(u^{ext}\)</span> to the vertices adjacent to a cut cell but not an inner cell, and <span class="math">\(u^{unused}\)</span> the rest of the vertices. The algorithms now restricts our solutions to those where <span class="math">\(u^{ext}\)</span> is of the form <span class="math">\(u^{ext} = T u^{in}\)</span>, where <span class="math">\(T\)</span> is linear. More specifically for each exterior degree of freedom we selected a close inner cell (using the base cell of the clustering), and define <span class="math">\(u_i\)</span> to be the value of the continuation of the function in the cell given the values of the function on the corners of that interior cell.</p>
+<p><a class="reference internal" href="_images/Nodetocell.png"><img alt="Nodetocell" src="_images/Nodetocell.png" style="width: 421px; height: 197px;" /></a></p>
+<p>where <span class="math">\(N^{out}_h\)</span> are the outer nodes.</p>
+<p>In conclusion, we reduce the problem <span class="math">\(Au = b\)</span>, by imposing restriction to the solution given by what is given in the paper resulting in:</p>
+<p><span class="math">\({\tilde{C^T}}A \tilde{C} = \tilde{C^T} b\)</span>, where <span class="math">\(\tilde{C} = (I, T, 0)^T\)</span>, with <span class="math">\(T\)</span> being the matrix that maps the degress of freedom in N<sup>in</sup> to the degress of freedom of N<sup>out</sup>. Generating the Matrix <span class="math">\(C\)</span> is the aim of the algorithm and the file <a class="reference internal" href="index.html#module-last_step" title="last_step"><code class="xref py py-mod docutils literal"><span class="pre">last_step</span></code></a> implements a method that returns the coefficients of the matrix <span class="math">\(\tilde{C}\)</span> given by index to value pairs (all other coefficients will be 0). The implementation of this method is different depending on whether we have a grid or or a mesh consisting of simplicies.</p>
+<div class="section" id="result-and-outlook">
+<h1>Result and Outlook<a class="headerlink" href="#result-and-outlook" title="Permalink to this headline">¶</a></h1>
+<p>In the notebook square_test we tested the algorithm using a simple poisson equation on a circular physical domain on a <cite>N times N</cite> square Grid and compared the results of this new method to the results of the old method, the results are shown in the following table:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="7%" />
+<col width="21%" />
+<col width="26%" />
+<col width="21%" />
+<col width="24%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">N</th>
+<th class="head">Error Old</th>
+<th class="head">Cond Old</th>
+<th class="head">Error New</th>
+<th class="head">Cond New</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>8</td>
+<td>0.041436</td>
+<td>3.9 * 10^7</td>
+<td>0.096531</td>
+<td>1.8 * 10^3</td>
+</tr>
+<tr class="row-odd"><td>10</td>
+<td>0.026746</td>
+<td>2.7 * 10^8</td>
+<td>0.080747</td>
+<td>5.8 * 10^3</td>
+</tr>
+<tr class="row-even"><td>15</td>
+<td>0.012055</td>
+<td>1.1 * 10^4</td>
+<td>0.032030</td>
+<td>1.3 * 10^4</td>
+</tr>
+<tr class="row-odd"><td>20</td>
+<td>0.006842</td>
+<td>1.0 * 10^9</td>
+<td>0.014049</td>
+<td>2.9 * 10^4</td>
+</tr>
+<tr class="row-even"><td>30</td>
+<td>0.003062</td>
+<td>1.1 * 10^9</td>
+<td>0.005649</td>
+<td>9.6 * 10^4</td>
+</tr>
+<tr class="row-odd"><td>100</td>
+<td>0.000278</td>
+<td>1.4 * 10^14</td>
+<td>0.000363</td>
+<td>1.3 * 10^6</td>
+</tr>
+</tbody>
+</table>
+<p>The new method in the tested case above had an error which was between 2 and 3 times larger than the old method but has a much better and well behaved condition number.</p>
+<p>A possible next step would be to make sure the algorithm also for 3D meshes, we tried to write it in a way to be as compatible as possible to the 3D case, but it was not tested.</p>
+<p>Another possible thing to do could be to check whether the algorithm could be extended to other function spaces than to H1 of order 1.</p>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/Third_step.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Daniel Draeger, Georgios Kypros.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.7</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+      |
+      <a href="_sources/Third_step.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

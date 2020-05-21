@@ -1,0 +1,102 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Introduction &#8212; Practical Course  documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
+<p>Unfitted finite element techniques are valuable tools in different applications where the gen-
+eration of body-fitted meshes is difficult. However, these techniques are prone to severe ill conditioning problems that obstruct the efficient use of iterative Krylov methods and, in consequence, hinders the practical usage of unfitted methods for realistic large scale applications. In this work, we present a technique that addresses such conditioning problems by constructing enhanced finite element spaces based on a cell aggregation technique. The presented method, called aggregated unfitted finite element method, is easy to implement, and can be used in Galerkin approximations of coercive problems with conforming Lagrangian finite element spaces. The mathematical analysis of the new method states that the condition number of the resulting linear system matrix scales as in standard finite elements for body-fitted meshes, without being affected by small cut cells, and that the method leads to the optimal finite element convergence order.</p>
+<p>Unfitted FE techniques are especially appealing when the generation of body-fitted meshes is difficult. They are helpful in a number of contexts including multi-phase and multi-physics applications with moving interfaces (e.g., fracture mechanics, fluid-structure interaction, or free surface flows). In addition, the huge success of isogeometrical analysis (spline-based discretization) and the severe limitations of this approach in complex 3D geometries will probably
+increase the interest of unfitted methods in the near future. Unfitted FE methods have been named in different ways. When designed for capturing interfaces, they are usually denoted as eXtended FE methods (XFEM), whereas they are usually denoted as embedded (or immersed) boundary methods, when the motivation is to simulate a problem using a (usually simple Cartesian) background mesh.</p>
+<p>Yet useful, unfitted FE methods have known drawbacks. They pose problems to numerical integration,
+imposition of Dirichlet boundary conditions, and lead to ill conditioning problems. Whereas different techniques have been proposed in the literature to address the issues related with numerical integration and the imposition of Dirichlet boundary conditions, the conditioning problems are one of the main showstoppers still today for the successful use of this type of methods in realistic large scale applications. For most of the unfitted FE techniques, the condition number of the discrete linear system does not only depend on the characteristic element size of the background mesh, but also on the characteristic size of the cut cells, which can be arbitrary small and have arbitrarily high aspect ratios. This is an important problem.</p>
+<p>The main goal of this work is to develop such an enhanced unfitted FE formulation that fixes the problems associated with cut cells. The goal is to achieve condition numbers that scale only with the element size of the background mesh in the same way as in standard FE methods for body-fitted meshes.</p>
+<p>We present a cell aggregation technique that can be used for both continuous and discontinuous formulations, the aggregated unfitted FE method. We start with the usual (conforming) Lagrangian FE space that includes cut cells, which is known to lead to conditioning problems. The main idea is to eliminate from this space all the potentially problematic DOFs by introducing a set of judiciously defined constraints. These constraints are introduced using information provided by the cell aggregates, without altering the conformity of the original FE space. Alternatively, the method can be understood as an extension operator from the interior (well-posed) FE space that only involves interior cells to a larger FE space that includes cut cells and covers the whole physical domain. Discontinuous spaces can also be generated as a particular case of this procedure, which makes the method compatible also with DG formulations.</p>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/Introduction.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Daniel Draeger, Georgios Kypros.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.7</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+      |
+      <a href="_sources/Introduction.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

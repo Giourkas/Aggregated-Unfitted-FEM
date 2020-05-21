@@ -1,0 +1,102 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Implementation &#8212; Practical Course  documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="implementation">
+<h1>Implementation<a class="headerlink" href="#implementation" title="Permalink to this headline">¶</a></h1>
+<p>Starting form the H1 space, the algorithm eliminates from this space all the potentially problematic DOFs by introducing a set of judiciously defined constraints. These constraints are introduced using information provided by mapping exterior verticies to close inner cells, without altering the conformity of the original FE space. Alternatively, the method can be understood as an extension operator from the interior (well-posed) FE space that only involves interior cells to a larger FE space that includes cut cells and covers the whole physical domain.</p>
+<p>The first step of the method is to build a computational mesh on the artificial domain <span class="math">\(Ω_{art}\)</span> such that it has simple geometry that is easy to mesh using Cartesian grids and it includes our physical domain <span class="math">\(Ω\subset Ω_{art}\)</span>. As we create the mesh, some of the or cells are cut in the boundary of the physical domain. These are noted as cut cells: <code class="xref py py-func docutils literal"><span class="pre">ci.GetElementsOfType(IF)()</span></code>, while the cells outside of the physical domain are given by <code class="xref py py-func docutils literal"><span class="pre">ci.GetElementsOfType(POS)()</span></code> and these inside the physical domain from <code class="xref py py-func docutils literal"><span class="pre">ci.GetElementsOfType(NEG)()</span></code>. The first three pictures show an example of the 3 different cell properties on the level set:</p>
+<p>lvlset = <span class="math">\(\sqrt{ \sqrt{x^4+y^4} -1}\)</span>
+which defines <span class="math">\(Ω\)</span> by: <span class="math">\(Ω = \{ x \in Ω_{art} | \text{lvlset}(x) &lt; 0 \}\)</span>
+The following images show the cut, inside and outside cells respectively:</p>
+<p><a class="reference internal" href="_images/cut_cells.png"><img alt="cut_cells" src="_images/cut_cells.png" style="width: 200px; height: 200px;" /></a> <a class="reference internal" href="_images/inner_cells.png"><img alt="inner_cells" src="_images/inner_cells.png" style="width: 200px; height: 200px;" /></a> <a class="reference internal" href="_images/outside_cells.png"><img alt="outside_cells" src="_images/outside_cells.png" style="width: 200px; height: 200px;" /></a></p>
+<p>The following figures show another example of a physical domain <span class="math">\(Ω\)</span> inside <span class="math">\(Ω_{art}(A)\)</span>, and the internal, cut and external cells summarized (B).</p>
+<p><img alt="incutex" src="_images/domain.png" /></p>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/First_step.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Daniel Draeger, Georgios Kypros.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.7</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+      |
+      <a href="_sources/First_step.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

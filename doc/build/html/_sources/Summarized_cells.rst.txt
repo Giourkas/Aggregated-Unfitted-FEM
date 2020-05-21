@@ -1,0 +1,1 @@
+The following figures show the physical domain :math:`Ω` inside the easy-to-mesh domain :math:`Ω_{art}` (A), and the internal, cut and external cells summarized (B)

@@ -1,0 +1,163 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import netgen.gui\n",
+    "%gui tk\n",
+    "\n",
+    "\n",
+    "# ngsolve stuff\n",
+    "from ngsolve import *\n",
+    "# basic geometry features (for the background mesh)\n",
+    "from netgen.geom2d import SplineGeometry\n",
+    "# visualization stuff\n",
+    "from ngsolve.internal import *\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "For some reason, not all faces are associated to an Element, so `len(f.elements)` might return 0,\n",
+    "however if it does not return 0, it alwass returns a one element list contains in the same number as the number of the face"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "f2e  F0   VEl 0\n",
+      "f2e  F86   VEl 86\n",
+      "f2e  F88   VEl 88\n",
+      "f2e  F94   VEl 94\n",
+      "f2e  F106   VEl 106\n",
+      "f2e  F107   VEl 107\n",
+      "f2e  F122   VEl 122\n",
+      "Num Elements: 124\n",
+      "Num Faces: 124\n",
+      "Num Elements associates to faces: 7\n"
+     ]
+    }
+   ],
+   "source": [
+    "square = SplineGeometry()\n",
+    "square.AddRectangle([-1.5,-1.5],[1.5,1.5],bc=1)\n",
+    "mesh = Mesh (square.GenerateMesh(maxh=0.4, quad_dominated=False))\n",
+    "\n",
+    "Draw(mesh)\n",
+    "sum_elements = 0\n",
+    "sum_elements_2 = 0\n",
+    "sum_faces = 0\n",
+    "for f in mesh.Elements(VOL):\n",
+    "    sum_elements_2 += 1\n",
+    "for f in mesh.faces:\n",
+    "    if len(f.elements) > 0:\n",
+    "        print(\"f2e \", f, \" \", f.elements[0])\n",
+    "    sum_elements += len(f.elements)\n",
+    "    sum_faces += 1\n",
+    "print(\"Num Elements:\", sum_elements_2)\n",
+    "print(\"Num Faces:\", sum_faces)\n",
+    "print(\"Num Elements associates to faces:\", sum_elements)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "for some reason `mesh[NodeId(ELEMENT, i)]` does not work well."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "3\n",
+      "3\n"
+     ]
+    },
+    {
+     "ename": "TypeError",
+     "evalue": "vertices only available for edge, face and cell nodes\n",
+     "output_type": "error",
+     "traceback": [
+      "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
+      "\u001b[0;31mTypeError\u001b[0m                                 Traceback (most recent call last)",
+      "\u001b[0;32m<ipython-input-3-8b36c294d50a>\u001b[0m in \u001b[0;36m<module>\u001b[0;34m()\u001b[0m\n\u001b[1;32m      4\u001b[0m \u001b[0mprint\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mlen\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0ma\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mvertices\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;31m# works\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      5\u001b[0m \u001b[0mprint\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mlen\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mb\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mvertices\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;31m# works\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m----> 6\u001b[0;31m \u001b[0mprint\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mlen\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mc\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mvertices\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;31m# fails\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m",
+      "\u001b[0;31mTypeError\u001b[0m: vertices only available for edge, face and cell nodes\n"
+     ]
+    }
+   ],
+   "source": [
+    "a = next(x for x in mesh.Elements(VOL))\n",
+    "b = mesh[NodeId(FACE, 0)]\n",
+    "c = mesh[NodeId(ELEMENT, 0)]\n",
+    "print(len(a.vertices)) # works\n",
+    "print(len(b.vertices)) # works\n",
+    "print(len(c.vertices)) # fails\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "`Draw()` fails silently when the name contains a space"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def DrawTest():\n",
+    "    l2 = L2(mesh)\n",
+    "    gf_e = GridFunction(l2)\n",
+    "    gf_e.vec[0] = True\n",
+    "    Draw(gf_e, mesh, \"first element\")\n",
+    "DrawTest()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.6.5"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
